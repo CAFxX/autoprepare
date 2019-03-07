@@ -1,4 +1,4 @@
-package sqlstmtcache
+package autoprepare
 
 import (
 	"database/sql"

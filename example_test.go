@@ -1,10 +1,8 @@
-package sqlstmtcache_test
+package autoprepare
 
 import (
 	"context"
 	"database/sql"
-
-	"github.com/CAFxX/sqlstmtcache"
 )
 
 func Example() {
@@ -16,7 +14,7 @@ func Example() {
 	defer db.Close()
 
 	// create a SqlStmtCache to automatically prepare your statements
-	dbsc, err := sqlstmtcache.New(db)
+	dbsc, err := New(db)
 	if err != nil {
 		panic(err)
 	}
