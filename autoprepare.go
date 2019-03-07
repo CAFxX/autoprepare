@@ -153,6 +153,14 @@ func (c *SQLStmtCache) dropStmts() {
 		return stmts[i].hit < stmts[j].hit
 	})
 
+	// we want to delete also any stmt that has 0 hits
+	for _, s := range stmts[victims:] {
+		if s.hit != 0 {
+			break
+		}
+		victims++
+	}
+
 	c.l.Lock()
 	for i, s := range stmts[:victims] {
 		delete(c.stmt, s.q)

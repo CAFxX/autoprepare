@@ -24,14 +24,20 @@ func New(db *sql.DB, opts ...SQLStmtCacheOpt) (*SQLStmtCache, error) {
 		stmt:         make(map[string]*stmt),
 		wrkThreshold: 5000,
 	}
+
+	// apply user-supplied options
 	for _, opt := range opts {
 		if err := opt(c); err != nil {
 			return nil, err
 		}
 	}
+
+	// automatically call Close() to destroy all PSs if the user
+	// forgets to do it
 	runtime.SetFinalizer(c, func(_c *SQLStmtCache) {
 		_c.Close()
 	})
+
 	return c, nil
 }
 
@@ -133,4 +139,18 @@ func (c *SQLStmtCache) ExecContextTx(ctx context.Context, tx *sql.Tx, sql string
 	}
 	defer s.release()
 	return tx.StmtContext(ctx, ps).ExecContext(ctx, values...)
+}
+
+// Statistics functions
+
+type SQLStmtCacheStats struct {
+	Prepared   uint64 // number of autoprepared statements created (Prepare() calls issued)
+	Unprepared uint64 // number of autoprepared statements deleted (sql.(*Stmt).Close() calls issued)
+	Hits       uint64 // number of SQL queries that used automatically-prepared statements
+	Misses     uint64 // number of SQL queries executed raw
+	Skips      uint64 // number of SQL queries that do not qualify for caching
+}
+
+func (c *SQLStmtCache) GetStats() SQLStmtCacheStats {
+	panic("not implemented")
 }
