@@ -13,6 +13,7 @@ const (
 	DefaultMaxQueryLen     = 4096
 	DefaultMaxPreparedStmt = 16
 	DefaultMaxStmt         = 1024
+	defaultWrkThreshold    = 5000
 )
 
 func New(db *sql.DB, opts ...SQLStmtCacheOpt) (*SQLStmtCache, error) {
@@ -22,7 +23,7 @@ func New(db *sql.DB, opts ...SQLStmtCacheOpt) (*SQLStmtCache, error) {
 		maxSqlLen:    DefaultMaxQueryLen,
 		maxStmt:      DefaultMaxStmt,
 		stmt:         make(map[string]*stmt),
-		wrkThreshold: 5000,
+		wrkThreshold: defaultWrkThreshold,
 	}
 
 	// apply user-supplied options

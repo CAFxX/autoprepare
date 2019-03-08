@@ -16,25 +16,25 @@ func Benchmark(b *testing.B) {
 	}{
 		{
 			name:   "Select",
-			create: "CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
+			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
 			query:  "SELECT * FROM t LIMIT 1",
 			args:   nil,
 		},
 		{
 			name:   "Select1",
-			create: "CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
+			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
 			query:  "SELECT * FROM t WHERE a = ? LIMIT 1",
 			args:   []interface{}{1},
 		},
 		{
 			name:   "Insert2",
-			create: "CREATE TABLE t (a INT, b TEXT)",
+			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT)",
 			query:  "INSERT INTO t (a, b) VALUES (?, ?)",
 			args:   []interface{}{1, "hello"},
 		},
 		{
 			name:   "Update2",
-			create: "CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
+			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
 			query:  "UPDATE t SET b = ? WHERE a = ?",
 			args:   []interface{}{"hello", 1},
 		},
