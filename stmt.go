@@ -34,6 +34,7 @@ func (s *stmt) release() {
 }
 
 func (s *stmt) wait() {
+	// TODO: check if using sync.Cond would be better here
 	for atomic.LoadUint32(&s.psHandles) > 0 {
 		runtime.Gosched()
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func BenchmarkSqlite(b *testing.B) {
+func Benchmark(b *testing.B) {
 	benchmarks := []struct {
 		name   string
 		create string
@@ -58,7 +58,7 @@ func BenchmarkSqlite(b *testing.B) {
 		}
 		b.Run(c.name, func(b *testing.B) {
 			b.Run("Serial", func(b *testing.B) {
-				if *Compare {
+				if *BenchCompare {
 					b.Run("NotPrepared", func(b *testing.B) {
 						db := init()
 						defer db.Close()
@@ -143,9 +143,12 @@ func BenchmarkSqlite(b *testing.B) {
 					}
 				})
 			})
+			if !*BenchParallel {
+				return
+			}
 			for _, par := range []int{1, 10, 100} {
 				b.Run(fmt.Sprintf("Parallel-%d", par), func(b *testing.B) {
-					if *Compare {
+					if *BenchCompare {
 						b.Run("NotPrepared", func(b *testing.B) {
 							db := init()
 							defer db.Close()
