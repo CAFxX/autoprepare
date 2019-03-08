@@ -15,7 +15,7 @@ func Benchmark(b *testing.B) {
 		args   []interface{}
 	}{
 		{
-			name:   "Select",
+			name:   "Select0",
 			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
 			query:  "SELECT * FROM t LIMIT 1",
 			args:   nil,
@@ -25,6 +25,14 @@ func Benchmark(b *testing.B) {
 			create: "DROP TABLE IF EXISTS t; CREATE TABLE t (a INT, b TEXT); INSERT INTO t VALUES (1, \"hello\")",
 			query:  "SELECT * FROM t WHERE a = ? LIMIT 1",
 			args:   []interface{}{1},
+		},
+		{
+			name: "SelectJoin1",
+			create: `DROP TABLE IF EXISTS t;  CREATE TABLE t (a INT, b INT);
+					 DROP TABLE IF EXISTS t2; CREATE TABLE t2 (a INT, b INT);
+					 DROP TABLE IF EXISTS t3; CREATE TABLE t3 (a INT, b TEXT)`,
+			query: "SELECT t.a, t2.a, t3.a, t3.b FROM t JOIN t2 ON t.b = t2.a JOIN t3 ON t2.b = t3.a WHERE t.a = ? LIMIT 1",
+			args:  []interface{}{1},
 		},
 		{
 			name:   "Insert2",
