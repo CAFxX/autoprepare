@@ -19,12 +19,7 @@ type SQLStmtCache struct {
 	hit       uint32 // number of lookups since last wrk start
 	wrkStatus uint32 // 0 wrk is not running, 1 wrk is running
 
-	// statistics
-	hits       uint64
-	misses     uint64
-	prepared   uint64
-	unprepared uint64
-	skipped    uint64
+	stats SQLStmtCacheStats
 
 	// configuration; constant after New() returns
 	c            *sql.DB // database connection
@@ -36,7 +31,7 @@ type SQLStmtCache struct {
 
 func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 	if len(query) > c.maxSqlLen {
-		atomic.AddUint64(&c.skipped, 1)
+		atomic.AddUint64(&c.stats.Skips, 1)
 		return nil
 	}
 
@@ -79,8 +74,8 @@ func (c *SQLStmtCache) wrk() {
 		victim.put(nil)
 		victim.wait()
 		atomic.AddUint32(&c.psCount, ^uint32(0))
+		atomic.AddUint64(&c.stats.Unprepared, 1)
 		ps.Close()
-		atomic.AddUint64(&c.unprepared, 1)
 	}
 	if replacement != nil && c.psCount < c.maxPS {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -90,7 +85,7 @@ func (c *SQLStmtCache) wrk() {
 		if err == nil {
 			replacement.put(ps)
 			atomic.AddUint32(&c.psCount, 1)
-			atomic.AddUint64(&c.prepared, 1)
+			atomic.AddUint64(&c.stats.Prepared, 1)
 		}
 	}
 	c.updateHits()

@@ -95,8 +95,8 @@ func (c *SQLStmtCache) Close() {
 			s.put(nil)
 			s.wait()
 			atomic.AddUint32(&c.psCount, ^uint32(0))
+			atomic.AddUint64(&c.stats.Unprepared, 1)
 			ps.Close()
-			atomic.AddUint64(&c.unprepared, 1)
 		}
 	}
 	c.stmt = nil
@@ -108,10 +108,11 @@ func (c *SQLStmtCache) QueryContext(ctx context.Context, sql string, values ...i
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return c.c.QueryContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return ps.QueryContext(ctx, values...)
 }
 
@@ -119,11 +120,11 @@ func (c *SQLStmtCache) QueryRowContext(ctx context.Context, sql string, values .
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
-		atomic.AddUint64(&c.misses, 1)
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return c.c.QueryRowContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return ps.QueryRowContext(ctx, values...)
 }
 
@@ -131,11 +132,11 @@ func (c *SQLStmtCache) ExecContext(ctx context.Context, sql string, values ...in
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
-		atomic.AddUint64(&c.misses, 1)
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return c.c.ExecContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return ps.ExecContext(ctx, values...)
 }
 
@@ -143,11 +144,11 @@ func (c *SQLStmtCache) QueryContextTx(ctx context.Context, tx *sql.Tx, sql strin
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
-		atomic.AddUint64(&c.misses, 1)
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return tx.QueryContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return tx.StmtContext(ctx, ps).QueryContext(ctx, values...)
 }
 
@@ -155,11 +156,11 @@ func (c *SQLStmtCache) QueryRowContextTx(ctx context.Context, tx *sql.Tx, sql st
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
-		atomic.AddUint64(&c.misses, 1)
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return tx.QueryRowContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return tx.StmtContext(ctx, ps).QueryRowContext(ctx, values...)
 }
 
@@ -167,11 +168,11 @@ func (c *SQLStmtCache) ExecContextTx(ctx context.Context, tx *sql.Tx, sql string
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
 	if ps == nil {
-		atomic.AddUint64(&c.misses, 1)
+		atomic.AddUint64(&c.stats.Misses, 1)
 		return tx.ExecContext(ctx, sql, values...)
 	}
 	defer s.release()
-	atomic.AddUint64(&c.hits, 1)
+	atomic.AddUint64(&c.stats.Hits, 1)
 	return tx.StmtContext(ctx, ps).ExecContext(ctx, values...)
 }
 
@@ -187,10 +188,10 @@ type SQLStmtCacheStats struct {
 
 func (c *SQLStmtCache) GetStats() SQLStmtCacheStats {
 	return SQLStmtCacheStats{
-		Hits:       atomic.LoadUint64(&c.hits),
-		Misses:     atomic.LoadUint64(&c.misses),
-		Skips:      atomic.LoadUint64(&c.skipped),
-		Prepared:   atomic.LoadUint64(&c.prepared),
-		Unprepared: atomic.LoadUint64(&c.unprepared),
+		Hits:       atomic.LoadUint64(&c.stats.Hits),
+		Misses:     atomic.LoadUint64(&c.stats.Misses),
+		Skips:      atomic.LoadUint64(&c.stats.Skips),
+		Prepared:   atomic.LoadUint64(&c.stats.Prepared),
+		Unprepared: atomic.LoadUint64(&c.stats.Unprepared),
 	}
 }
