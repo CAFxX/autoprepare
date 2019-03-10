@@ -19,6 +19,13 @@ type SQLStmtCache struct {
 	hit       uint32 // number of lookups since last wrk start
 	wrkStatus uint32 // 0 wrk is not running, 1 wrk is running
 
+	// statistics
+	hits       uint64
+	misses     uint64
+	prepared   uint64
+	unprepared uint64
+	skipped    uint64
+
 	// configuration; constant after New() returns
 	c            *sql.DB // database connection
 	maxPS        uint32  // maximum number of prepared statements
@@ -29,6 +36,7 @@ type SQLStmtCache struct {
 
 func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 	if len(query) > c.maxSqlLen {
+		atomic.AddUint64(&c.skipped, 1)
 		return nil
 	}
 
@@ -50,6 +58,7 @@ func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 		c.l.Lock() // FIXME: ctx
 		if len(c.stmt) < c.maxStmt {
 			if s, ok = c.stmt[query]; !ok {
+				// TODO: create a new object only once in N occurrences
 				c.stmt[query] = &stmt{hit: 1, q: query}
 			}
 		}
@@ -65,20 +74,23 @@ func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 
 func (c *SQLStmtCache) wrk() {
 	victim, replacement := c.getCandidates()
-	if victim != nil && c.psCount >= c.maxPS {
+	if victim != nil && atomic.LoadUint32(&c.psCount) >= c.maxPS {
 		ps := victim.get()
 		victim.put(nil)
 		victim.wait()
-		c.psCount--
+		atomic.AddUint32(&c.psCount, ^uint32(0))
 		ps.Close()
+		atomic.AddUint64(&c.unprepared, 1)
 	}
 	if replacement != nil && c.psCount < c.maxPS {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		ps, err := c.c.PrepareContext(ctx, replacement.q)
+		// TODO: blacklist for statements that fail to be prepared
 		if err == nil {
 			replacement.put(ps)
-			c.psCount++
+			atomic.AddUint32(&c.psCount, 1)
+			atomic.AddUint64(&c.prepared, 1)
 		}
 	}
 	c.updateHits()
@@ -113,6 +125,8 @@ func (c *SQLStmtCache) getCandidates() (victim, replacement *stmt) {
 
 func (c *SQLStmtCache) updateHits() {
 	c.l.RLock()
+	defer c.l.RUnlock()
+
 	for _, s := range c.stmt {
 		var hit uint32
 		for {
@@ -122,7 +136,6 @@ func (c *SQLStmtCache) updateHits() {
 			}
 		}
 	}
-	c.l.RUnlock()
 }
 
 func (c *SQLStmtCache) dropStmts() {
@@ -153,7 +166,7 @@ func (c *SQLStmtCache) dropStmts() {
 		return stmts[i].hit < stmts[j].hit
 	})
 
-	// we want to delete also any stmt that has 0 hits
+	// we want to delete also all statements that have 0 hits
 	for _, s := range stmts[victims:] {
 		if s.hit != 0 {
 			break
