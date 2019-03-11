@@ -7,24 +7,30 @@ your application executes and then automatically creates and uses the correspond
 Instead of doing (error handling omitted for brevity):
 
 ```
-	db, _ := sql.Open("mysql", "/mydb")
-    res, _ := db.QueryContext(context.Background(), "SELECT * FROM mytable WHERE id = ?", 1)
+db, _ := sql.Open("mysql", "/mydb")
+res, _ := db.QueryContext(context.Background(), "SELECT * FROM mytable WHERE id = ?", 1)
+// ... many more queries ...
 ```
 
 you can do:
 
 ```
-	db, _ := sql.Open("mysql", "/mydb")
-	dbsc, _ := autoprepare.New(db)
-	res, _ := dbsc.QueryContext(context.Background(), "SELECT * FROM mytable WHERE id = ?", 1)
+db, _ := sql.Open("mysql", "/mydb")
+dbsc, _ := autoprepare.New(db)
+res, _ := dbsc.QueryContext(context.Background(), "SELECT * FROM mytable WHERE id = ?", 1)
+// ... many more queries ...
 ```
 
 and `autoprepare` will transparently start using prepared statements for the most common queries.
 
-`autoprepare` is pretty conservative, as it will only prepare the most frequently executed statements,
-and it will only prepare a limited number of them (by default 16, see `WithMaxPreparedStmt`). Statement 
-preparation occurs in the background. If a prepared statement stops being frequently executed it will
-be closed so that other statements can be prepared instead.
+`autoprepare` is deliberately pretty conservative, as it will only prepare the most frequently executed 
+statements, and it will only prepare a limited number of them (by default 16, see `WithMaxPreparedStmt`).
+Statement preparation occurs in the background, not when queries are executed, to limit latency spikes
+and to simplify the code. Statement preparation is triggered after a sizable amount of queries have been
+sent (currently 5000), and will result in a single statement (the most common in the last 5000 queries)
+being prepared. The frequency of executions is estimated using an exponential moving average.
+If a prepared statement stops being frequently executed it will be closed so that other statements can be
+prepared instead.
 
 To limit the amount of memory used, both by the library and on the database, only statements shorter
 than a certain length (by default 4KB, see `WithMaxQueryLen`) are eligibile for preparation.
