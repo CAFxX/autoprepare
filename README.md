@@ -23,6 +23,38 @@ res, _ := dbsc.QueryContext(context.Background(), "SELECT * FROM mytable WHERE i
 
 and `autoprepare` will transparently start using prepared statements for the most common queries.
 
+## Performance
+
+**tl;dr you can expect from no improvements to 100% better throughput ¯\_(ツ)_/¯** 
+
+The effect of using prepared statements varies wildly with your database, type of queries and workloads.
+
+A small benchmark is included in the test harness. You can run it with:
+
+```
+go test -run=NONE -bench=.
+```
+
+This will run it against an in-memory sqlite database. To run it instead against a mysql database
+(replace `$MYSQL_DSN` with the DSN for your MySQL database):
+
+```
+go test -run=NONE -bench=. -benchdriver=mysql -mysql="$MYSQL_DSN" -benchparallel=false
+```
+
+Running the commands above and analyzing the results yields something like:
+
+> add benchmark graph here
+
+NotPrepared means sending queries without preparing them, Prepared means sending the queries after
+manually calling `Prepare()` on them and AutoPrepared is letting `autoprepare` handle preparing
+statements.
+
+Currently the only drivers included in benchmark_test.go are sqlite and mysql. You can add additional
+drivers if you want to benchmark other databases.
+
+## Tips and notes
+
 `autoprepare` is deliberately pretty conservative, as it will only prepare the most frequently executed 
 statements, and it will only prepare a limited number of them (by default 16, see `WithMaxPreparedStmt`).
 Statement preparation occurs in the background, not when queries are executed, to limit latency spikes
