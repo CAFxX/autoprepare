@@ -52,13 +52,14 @@ type SQLStmtCacheOpt func(*SQLStmtCache) error
 // prepared at any one time, across all clients and connections: be sure not
 // to set this number too high, or to use too many concurrent connections,
 // or to use too many concurrent clients.
+// Setting this value to 0 disables the SQLStmtCache.
 func WithMaxPreparedStmt(max int) SQLStmtCacheOpt {
 	return func(c *SQLStmtCache) error {
 		if max > 1<<12 {
 			return errors.New("WithMaxPreparedStmt should be no more than 4096")
 		}
-		if max <= 0 {
-			return errors.New("WithMaxPreparedStmt should be more than 0")
+		if max < 0 {
+			return errors.New("WithMaxPreparedStmt should be at least 0")
 		}
 		c.maxPS = uint32(max)
 		return nil

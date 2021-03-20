@@ -31,6 +31,9 @@ type SQLStmtCache struct {
 }
 
 func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
+	if c.maxPS == 0 {
+		return nil
+	}
 	if len(query) > c.maxSqlLen {
 		atomic.AddUint64(&c.stats.Skips, 1)
 		return nil
