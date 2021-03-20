@@ -28,7 +28,7 @@ and `autoprepare` will transparently start using prepared statements for the mos
 
 ## Performance
 
-**tl;dr Depending on your workload and setup you can expect from no improvements to extremely improved throughput ¯\\_(ツ)_/¯**
+**tl;dr Depending on your workload and setup you can expect from no improvements to extremely improved throughput ¯\\\_(ツ)\_/¯**
 
 The effect of using prepared statements varies wildly with your database, network latencies, type of queries and workloads. The only way to know for sure is to benchmark your workloads.
 
