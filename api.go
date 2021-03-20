@@ -17,6 +17,7 @@ const (
 	defaultWrkThreshold    = 5000
 )
 
+// New creates a new SQLStmtCache, with the provided options, that wraps the provided *sql.DB instance.
 func New(db *sql.DB, opts ...SQLStmtCacheOpt) (*SQLStmtCache, error) {
 	c := &SQLStmtCache{
 		c:            db,
@@ -45,6 +46,12 @@ func New(db *sql.DB, opts ...SQLStmtCacheOpt) (*SQLStmtCache, error) {
 
 type SQLStmtCacheOpt func(*SQLStmtCache) error
 
+// WithMaxPreparedStmt specifies the maximum number of prepared statements
+// that will exist at any one time. It defaults to DefaultMaxPreparedStmt.
+// Some databases (e.g. mysql) have limits to how many statements can be
+// prepared at any one time, across all clients and connections: be sure not
+// to set this number too high, or to use too many concurrent connections,
+// or to use too many concurrent clients.
 func WithMaxPreparedStmt(max int) SQLStmtCacheOpt {
 	return func(c *SQLStmtCache) error {
 		if max > 1<<12 {
@@ -58,6 +65,9 @@ func WithMaxPreparedStmt(max int) SQLStmtCacheOpt {
 	}
 }
 
+// WithMaxStmt specifies a soft upper limit on how many different SQL statements
+// to track to be able to pick the most frequently used one, that will be promoted
+// to a prepared statement. It defaults to DefaultMaxStmt.
 func WithMaxStmt(max int) SQLStmtCacheOpt {
 	return func(c *SQLStmtCache) error {
 		if max > 1<<16 {
@@ -71,6 +81,9 @@ func WithMaxStmt(max int) SQLStmtCacheOpt {
 	}
 }
 
+// WithMaxQueryLen specifies the maximum length of a SQL statement to be considered
+// by autoprepare. Statements longer than this number are executed as-is and no
+// prepared statements are ever cached. It defaults to DefaultMaxQueryLen.
 func WithMaxQueryLen(max int) SQLStmtCacheOpt {
 	return func(c *SQLStmtCache) error {
 		if max > 1<<20 {
@@ -84,6 +97,8 @@ func WithMaxQueryLen(max int) SQLStmtCacheOpt {
 	}
 }
 
+// Close closes and frees all resources associated with the prepared statement cache.
+// The SQLStmtCache should not be used after Close() has been called.
 func (c *SQLStmtCache) Close() {
 	c.l.Lock()
 	defer c.l.Unlock()
@@ -104,6 +119,8 @@ func (c *SQLStmtCache) Close() {
 
 // Query functions
 
+// QueryContext is equivalent to (*sql.DB).QueryContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) QueryContext(ctx context.Context, sql string, values ...interface{}) (*sql.Rows, error) {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -116,6 +133,8 @@ func (c *SQLStmtCache) QueryContext(ctx context.Context, sql string, values ...i
 	return ps.QueryContext(ctx, values...)
 }
 
+// QueryRowContext is equivalent to (*sql.DB).QueryRowContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) QueryRowContext(ctx context.Context, sql string, values ...interface{}) *sql.Row {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -128,6 +147,8 @@ func (c *SQLStmtCache) QueryRowContext(ctx context.Context, sql string, values .
 	return ps.QueryRowContext(ctx, values...)
 }
 
+// ExecContext is equivalent to (*sql.DB).ExecContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) ExecContext(ctx context.Context, sql string, values ...interface{}) (sql.Result, error) {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -140,6 +161,8 @@ func (c *SQLStmtCache) ExecContext(ctx context.Context, sql string, values ...in
 	return ps.ExecContext(ctx, values...)
 }
 
+// QueryContextTx is equivalent to tx.QueryContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) QueryContextTx(ctx context.Context, tx *sql.Tx, sql string, values ...interface{}) (*sql.Rows, error) {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -152,6 +175,8 @@ func (c *SQLStmtCache) QueryContextTx(ctx context.Context, tx *sql.Tx, sql strin
 	return tx.StmtContext(ctx, ps).QueryContext(ctx, values...)
 }
 
+// QueryRowContextTx is equivalent to tx.QueryRowContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) QueryRowContextTx(ctx context.Context, tx *sql.Tx, sql string, values ...interface{}) *sql.Row {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -164,6 +189,8 @@ func (c *SQLStmtCache) QueryRowContextTx(ctx context.Context, tx *sql.Tx, sql st
 	return tx.StmtContext(ctx, ps).QueryRowContext(ctx, values...)
 }
 
+// ExecContextTx is equivalent to tx.ExecContext, but it transparently creates and uses
+// prepared statements for the most frequently-executed queries.
 func (c *SQLStmtCache) ExecContextTx(ctx context.Context, tx *sql.Tx, sql string, values ...interface{}) (sql.Result, error) {
 	s := c.getPS(ctx, sql)
 	ps := s.acquire()
@@ -186,6 +213,7 @@ type SQLStmtCacheStats struct {
 	Skips      uint64 // number of SQL queries that do not qualify for caching
 }
 
+// GetStats returns statistics about the state and effectiveness of the prepared statements cache.
 func (c *SQLStmtCache) GetStats() SQLStmtCacheStats {
 	return SQLStmtCacheStats{
 		Hits:       atomic.LoadUint64(&c.stats.Hits),

@@ -11,6 +11,7 @@ import (
 
 // TODO: call wrk() during GC, and have it more aggressive (eventually all PS should be closed)
 
+// SQLStmtCache transparently caches and uses prepared SQL statements.
 type SQLStmtCache struct {
 	l    sync.RWMutex
 	stmt map[string]*stmt // protected by l
