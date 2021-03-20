@@ -15,8 +15,6 @@ type stmt struct {
 
 // Helpers for atomic access to prepared statement
 
-var noPS = sql.Stmt{}
-
 func (s *stmt) acquire() *sql.Stmt {
 	if s == nil {
 		return nil
@@ -45,15 +43,9 @@ func (s *stmt) get() *sql.Stmt {
 		return nil
 	}
 	v, _ := s.ps.Load().(*sql.Stmt)
-	if v == &noPS {
-		return nil
-	}
 	return v
 }
 
 func (s *stmt) put(v *sql.Stmt) {
-	if v == nil {
-		v = &noPS
-	}
 	s.ps.Store(v)
 }
