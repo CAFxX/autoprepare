@@ -77,6 +77,7 @@ to set a limit to how many connections the `database/sql` pool will open to the 
 every prepared statement will need to be created on every connection, and some databases have internal
 limits to how many prepared statements can exist at the same time: in this case the recommendation is to
 monitor the number of prepared statements and memory usage on the database server.
+Using `WithMaxPreparedStmt(0)` effectively disables all functionality provided by `autoprepare`.
 
 It is important to understand that `autoprepare` uses the SQL query string to lookup prepared statements;
 this means that it is critical, to allow `autoprepare` to be effective, to use placeholders in queries
