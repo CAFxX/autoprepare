@@ -1,6 +1,6 @@
 # autoprepare
 
-Automatically prepare frequently-executed `database/sql` statements
+Automatically prepare frequently-executed `database/sql` statements [![Go Reference](https://pkg.go.dev/badge/github.com/CAFxX/autoprepare.svg)](https://pkg.go.dev/github.com/CAFxX/autoprepare)
 
 `autoprepare` is a small library that transparently monitors the most frequent `database/sql` queries that
 your application executes and then automatically creates and uses the corresponding prepared statements.
@@ -28,11 +28,11 @@ and `autoprepare` will transparently start using prepared statements for the mos
 
 ## Performance
 
-**tl;dr Depending on your workload and setup you can expect from no improvements to 100% better throughput ¯\\_(ツ)_/¯**
+**tl;dr Depending on your workload and setup you can expect from no improvements to extremely improved throughput ¯\\_(ツ)_/¯**
 
 The effect of using prepared statements varies wildly with your database, network latencies, type of queries and workloads. The only way to know for sure is to benchmark your workloads.
 
-Depending on the configuration (see below) and your workload, it may take some time for all important queries to be executed with prepared statements. When benchmarking make sure the prepared statement cache is fully warmed up. By default it takes N*5000 SQL queries for autoprepare to prepare the statements for the N most frequently executed queries (by default N is limited to 16): so e.g. if your application performs 3 hot SQL queries, it's going to take at least 15000 queries before statements are created for the 3 hottest SQL queries.
+Depending on the configuration (see below) and your workload, it may take some time for all important queries to be executed with prepared statements. When benchmarking make sure the prepared statement cache is fully warmed up. By default it takes N*5000 SQL queries for autoprepare to prepare the statements for the N most frequently executed queries (by default N is limited to 16): so e.g. if your application performs 3 really hot SQL queries, it's going to take at least 15000 queries before statements are created for those 3 queries.
 
 A small benchmark is included in the test harness. You can run it with:
 
