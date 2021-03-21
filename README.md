@@ -88,14 +88,14 @@ It is also important to note that the lookup is done on the SQL query string as-
 so e.g.
 
 ```sql
-SELECT * FROM table
+SELECT * FROM `t`
 ```
 
 and
 
 ```sql
 SELECT *
-FROM table
+FROM `t`
 ```
 
 are considered separate queries by `autoprepare`, even though they are equivalent for the database.
