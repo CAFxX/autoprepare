@@ -58,7 +58,7 @@ func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 		if len(c.stmt) < c.maxStmt {
 			if s, ok = c.stmt[query]; !ok {
 				// TODO: create a new object only once in N occurrences
-				c.stmt[query] = &stmt{hit: 1, q: query}
+				c.stmt[query] = newStmt(query, 1)
 			}
 		}
 		c.l.Unlock()
@@ -67,19 +67,16 @@ func (c *SQLStmtCache) getPS(ctx context.Context, query string) *stmt {
 		}
 	}
 
-	atomic.AddUint32(&s.hit, 1)
+	atomic.AddUint64(&s.hit, 1)
 	return s
 }
 
 func (c *SQLStmtCache) wrk() {
 	victim, replacement := c.getCandidates()
 	if victim != nil && atomic.LoadUint32(&c.psCount) >= c.maxPS {
-		ps := victim.get()
-		victim.put(nil)
-		victim.wait()
+		victim.close()
 		atomic.AddUint32(&c.psCount, ^uint32(0))
 		atomic.AddUint64(&c.stats.Unprepared, 1)
-		ps.Close()
 	}
 	if replacement != nil && c.psCount < c.maxPS {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -101,21 +98,21 @@ func (c *SQLStmtCache) getCandidates() (victim, replacement *stmt) {
 	defer c.l.RUnlock()
 
 	for _, s := range c.stmt {
-		if s.get() != nil {
-			if victim == nil || atomic.LoadUint32(&victim.hit) > atomic.LoadUint32(&s.hit) {
+		if s.prepared() {
+			if victim == nil || atomic.LoadUint64(&victim.hit) > atomic.LoadUint64(&s.hit) {
 				victim = s
 			}
 		} else {
-			if replacement == nil || atomic.LoadUint32(&replacement.hit) < atomic.LoadUint32(&s.hit) {
+			if replacement == nil || atomic.LoadUint64(&replacement.hit) < atomic.LoadUint64(&s.hit) {
 				replacement = s
 			}
 		}
 	}
 
-	if victim != nil && replacement == nil && atomic.LoadUint32(&victim.hit) > 0 {
+	if victim != nil && replacement == nil && atomic.LoadUint64(&victim.hit) > 0 {
 		return nil, nil
 	}
-	if victim != nil && replacement != nil && atomic.LoadUint32(&victim.hit) >= atomic.LoadUint32(&replacement.hit) {
+	if victim != nil && replacement != nil && atomic.LoadUint64(&victim.hit) >= atomic.LoadUint64(&replacement.hit) {
 		return nil, nil
 	}
 	// TODO: do not promote replacements that represent less than a certain % of queries, e.g. p < 1/maxPS
@@ -127,10 +124,9 @@ func (c *SQLStmtCache) updateHits() {
 	defer c.l.RUnlock()
 
 	for _, s := range c.stmt {
-		var hit uint32
 		for {
-			hit = atomic.LoadUint32(&s.hit)
-			if atomic.CompareAndSwapUint32(&s.hit, hit, hit/2) {
+			hit := atomic.LoadUint64(&s.hit)
+			if atomic.CompareAndSwapUint64(&s.hit, hit, hit/2) {
 				break
 			}
 		}
@@ -139,7 +135,7 @@ func (c *SQLStmtCache) updateHits() {
 
 func (c *SQLStmtCache) dropStmts() {
 	type _stmt struct {
-		hit uint32
+		hit uint64
 		q   string
 	}
 
@@ -152,8 +148,8 @@ func (c *SQLStmtCache) dropStmts() {
 
 	stmts := make([]_stmt, len(c.stmt))
 	for q, s := range c.stmt {
-		if s.get() == nil {
-			stmts = append(stmts, _stmt{hit: atomic.LoadUint32(&s.hit), q: q})
+		if !s.prepared() {
+			stmts = append(stmts, _stmt{hit: atomic.LoadUint64(&s.hit), q: q})
 		}
 	}
 

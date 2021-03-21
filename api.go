@@ -107,12 +107,10 @@ func (c *SQLStmtCache) Close() {
 		return
 	}
 	for _, s := range c.stmt {
-		if ps := s.get(); ps != nil {
-			s.put(nil)
-			s.wait()
+		if s.prepared() {
+			s.close()
 			atomic.AddUint32(&c.psCount, ^uint32(0))
 			atomic.AddUint64(&c.stats.Unprepared, 1)
-			ps.Close()
 		}
 	}
 	c.stmt = nil

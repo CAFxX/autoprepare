@@ -2,50 +2,69 @@ package autoprepare
 
 import (
 	"database/sql"
-	"runtime"
-	"sync/atomic"
+	"sync"
 )
 
 type stmt struct {
-	ps        atomic.Value // *sql.Stmt
-	psHandles uint32       // number of goroutines using ps
-	hit       uint32
+	cond      sync.Cond
+	lock      sync.Mutex
+	ps        *sql.Stmt
+	psHandles uint32 // number of goroutines using ps
+	hit       uint64
 	q         string
 }
 
-// Helpers for atomic access to prepared statement
+func newStmt(sql string, hit uint64) *stmt {
+	s := &stmt{q: sql, hit: hit}
+	s.cond.L = &s.lock
+	return s
+}
 
 func (s *stmt) acquire() *sql.Stmt {
 	if s == nil {
 		return nil
 	}
-	atomic.AddUint32(&s.psHandles, 1)
-	if ps := s.get(); ps != nil {
-		return ps
+	s.lock.Lock()
+	ps := s.ps
+	if ps != nil {
+		s.psHandles += 1
 	}
-	s.release()
-	return nil
+	s.lock.Unlock()
+	return ps
 }
 
 func (s *stmt) release() {
-	atomic.AddUint32(&s.psHandles, ^uint32(0) /* -1 */)
+	s.lock.Lock()
+	s.psHandles -= 1
+	if s.psHandles == 0 {
+		s.cond.Broadcast()
+	}
+	s.lock.Unlock()
 }
 
-func (s *stmt) wait() {
-	// TODO: check if using sync.Cond would be better here
-	for atomic.LoadUint32(&s.psHandles) > 0 {
-		runtime.Gosched()
+func (s *stmt) close() {
+	s.lock.Lock()
+	for s.psHandles > 0 {
+		s.cond.Wait()
 	}
-}
-
-func (s *stmt) get() *sql.Stmt {
-	if s == nil {
-		return nil
-	}
-	v, _ := s.ps.Load().(*sql.Stmt)
-	return v
+	ps := s.ps
+	s.ps = nil
+	s.lock.Unlock()
+	ps.Close()
 }
 
 func (s *stmt) put(v *sql.Stmt) {
-	s.ps.Store(v)
+	if v == nil {
+		panic("nil *sql.Stmt")
+	}
+	s.lock.Lock()
+	s.ps = v
+	s.lock.Unlock()
+}
+
+func (s *stmt) prepared() (prepared bool) {
+	s.lock.Lock()
+	prepared = s.ps != nil
+	s.lock.Unlock()
+	return
 }

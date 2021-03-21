@@ -92,13 +92,14 @@ func TestSqlStmtCachePollute(t *testing.T) {
 
 	psCount := uint32(0)
 	for _, s := range dbsc.stmt {
-		if s.get() != nil {
+		prepared := s.prepared()
+		if prepared {
 			psCount++
 		}
 		_, expected := expstmt[s.q]
-		if s.get() != nil && !expected {
+		if prepared && !expected {
 			t.Errorf("unexpected prepared statement %q", s.q)
-		} else if s.get() == nil && expected {
+		} else if !prepared && expected {
 			t.Errorf("missing prepared statement %q", s.q)
 		}
 	}
