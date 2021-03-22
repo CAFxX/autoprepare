@@ -32,7 +32,7 @@ and `autoprepare` will transparently start using prepared statements for the mos
 
 The effect of using prepared statements varies wildly with your database, network latencies, type of queries and workloads. The only way to know for sure is to benchmark your workloads.
 
-Depending on the configuration (see below) and your workload, it may take some time for all important queries to be executed with prepared statements. When benchmarking make sure the prepared statement cache is fully warmed up. By default it takes N*5000 SQL queries for autoprepare to prepare the statements for the N most frequently executed queries (by default N is limited to 16): so e.g. if your application performs 3 really hot SQL queries, it's going to take at least 15000 queries before statements are created for those 3 queries.
+Depending on the configuration (see below) and your workload, it may take some time for all important queries to be executed with prepared statements. When benchmarking make sure the prepared statement cache is fully warmed up. By default it takes N\*5000 SQL queries for autoprepare to prepare the statements for the N most frequently executed queries (by default N is limited to 16): so e.g. if your application performs 3 really hot SQL queries, it's going to take at least 15000 queries before statements are created for those 3 queries.
 
 A small benchmark is included in the test harness. You can run it with:
 
@@ -61,7 +61,8 @@ drivers if you want to benchmark other databases.
 ## Tips and notes
 
 `autoprepare` is deliberately pretty conservative, as it will only prepare the most frequently executed 
-statements, and it will only prepare a limited number of them (by default 16, see `WithMaxPreparedStmt`).
+statements, and it will only prepare a limited number of them (by default 16, see 
+[`WithMaxPreparedStmt`](https://pkg.go.dev/github.com/CAFxX/autoprepare#WithMaxPreparedStmt)).
 Statement preparation occurs in the background, not when queries are executed, to limit latency spikes
 and to simplify the code. Statement preparation is triggered after a sizable amount of queries have been
 sent (currently 5000), and will result in a single statement (the most common in the last 5000 queries)
@@ -70,14 +71,20 @@ If a prepared statement stops being frequently executed it will be closed so tha
 prepared instead.
 
 To limit the amount of memory used, both by the library and on the database, only statements shorter
-than a certain length (by default 4KB, see `WithMaxQueryLen`) are eligibile for preparation.
+than a certain length (by default 4KB, see
+[`WithMaxQueryLen`](https://pkg.go.dev/github.com/CAFxX/autoprepare#WithMaxQueryLen)) are eligibile for
+preparation.
 
-It is recommended to not raise `WithMaxPreparedStmt` unnecessarily and to always use `sql.(*DB).SetMaxConn`
-to set a limit to how many connections the `database/sql` pool will open to the database, as potentially
-every prepared statement will need to be created on every connection, and some databases have internal
-limits to how many prepared statements can exist at the same time: in this case the recommendation is to
-monitor the number of prepared statements and memory usage on the database server.
-Using `WithMaxPreparedStmt(0)` effectively disables all functionality provided by `autoprepare`.
+It is recommended to not raise
+[`WithMaxPreparedStmt`](https://pkg.go.dev/github.com/CAFxX/autoprepare#WithMaxPreparedStmt) 
+unnecessarily and to always use
+[`(*sql.DB).SetMaxOpenConns`](https://golang.org/pkg/database/sql/#DB.SetMaxOpenConns) to set a limit to
+how many connections the `database/sql` pool will open to the database, as potentially every prepared
+statement will need to be created on every connection, and some databases have internal limits to how
+many prepared statements can exist at the same time: in this case the recommendation is to monitor the
+number of prepared statements and memory usage on the database server.
+Using [`WithMaxPreparedStmt(0)`](https://pkg.go.dev/github.com/CAFxX/autoprepare#WithMaxPreparedStmt)
+effectively disables all functionality provided by `autoprepare`.
 
 It is important to understand that `autoprepare` uses the SQL query string to lookup prepared statements;
 this means that it is critical, to allow `autoprepare` to be effective, to use placeholders in queries
